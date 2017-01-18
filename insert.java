@@ -1,3 +1,6 @@
+//template to insert whatever the content of csv. Replace "tags"
+//with appropriate name of what to insert
+
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
