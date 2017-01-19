@@ -1,4 +1,4 @@
-//template to insert whatever the content of csv. Replace "tags"
+//template to bulk insert whatever the content of csv. Replace "tags"
 //with appropriate name of what to insert
 
 import java.io.BufferedReader;
