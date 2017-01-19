@@ -1,10 +1,12 @@
+//Bulk string manipulation
+
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
-public class parseMovie {
+public class ParseFile {
 
 	private static FileWriter writer;
 
