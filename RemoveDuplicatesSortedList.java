@@ -39,7 +39,7 @@ public class RemoveDuplicatesSortedList {
 			while (curr != null) {
 				x = curr.val;
 				s = s.append(x);
-				//System.out.println(x);
+				System.out.println(x);
 				while (x == curr.next.val ) {
 					x = curr.val;
 					curr = curr.next;
