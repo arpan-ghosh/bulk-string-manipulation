@@ -9,16 +9,15 @@
  * @author Arpan Ghosh
  */
 public class RemoveDuplicatesSortedList {
-	
 
-	/**
-	 * Definition for singly-linked list.
-	 * public class ListNode {
-	 *     int val;
-	 *     ListNode next;
-	 *     ListNode(int x) { val = x; }
-	 * }
-	 */
+	  /**
+	   * Definition for singly-linked list.
+	   * public class ListNode {
+	   *     int val;
+	   *     ListNode next;
+	   *     ListNode(int x) { val = x; }
+	   * }
+	   */
 		public static class ListNode {
 			int val;
 			ListNode next;
@@ -27,30 +26,29 @@ public class RemoveDuplicatesSortedList {
 			}
 		}
 			
-	
 	    public static ListNode deleteDuplicates(ListNode head) {
 	    	
 	    	ListNode curr = head;
-
-			StringBuilder s = new StringBuilder("");
-		
-			int x = 0;
+	    	ListNode next;
 			
-			while (curr != null) {
-				x = curr.val;
-				s = s.append(x);
-				System.out.println(x);
-				while (x == curr.next.val ) {
-					x = curr.val;
-					curr = curr.next;
-				}		
-				System.out.print(s);
-				curr = curr.next;
+			if (head == null) {
+				return head;
 			}
-	    	
-	        return head;
+			
+			while (curr.next != null) {
+				if (curr.val == curr.next.val) {
+					next = curr.next.next;
+					curr.next = null;
+					curr.next = next;
+				} else {
+					curr = curr.next;
+				}
+				System.out.println(curr.val);
+			}
+	        return curr;
 	    }
-	
+	    
+	    
 	    public static void main (String[] args) {
 	    	
 	    	ListNode list = new ListNode(1);
@@ -62,10 +60,8 @@ public class RemoveDuplicatesSortedList {
 	    	list.next.next = list3;
 	    	list.next.next.next = list4;
 	    	list.next.next.next.next = null;
-
-	    	
+  	
 	    	deleteDuplicates(list);
-
-	    }
-	    
+	    	
+	    }	    
 }
