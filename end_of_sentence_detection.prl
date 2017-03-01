@@ -1,0 +1,273 @@
+#!/usr/local/bin/perl -w
+
+use FileHandle;
+use strict;
+
+############################################################
+##  EXAMPLE SHELL FOR END-OF-SENTENCE CLASSIFIER
+##
+##    hw1a.prl < sent.data.train
+##
+##  Suggestion: run in a wide window
+############################################################
+
+
+my $CS466  = ".";  # directory path on condor 
+
+my @correct;
+my @incorrect;
+
+my $abbrvs = { };   # hash of common abbreviations
+my $titles = { };   # hash of common titles
+my $unlikely_proper_nouns = { }; #hash of unlikely proper nouns
+my $timeterms = { }; #timeterms
+my $sentence_internal = { }; # #hash of sentence internal
+
+my $line      = undef;   # used to store a line of input
+my $correct   = 0;       # the number of correct classifications made
+my $incorrect = 0;       # the number of incorrect classifications made
+
+my $numRules = 12;
+my $counter = 0;		# counts the total number counted
+
+&initialize_set( $abbrvs, "$CS466/abbrevs" );
+&initialize_set( $titles, "$CS466/titles"  );
+#initializing below the sets from examp4.prl
+&initialize_set( $unlikely_proper_nouns, "$CS466/unlikely_proper_nouns" ); 
+&initialize_set( $timeterms, "$CS466/timeterms" ); 
+&initialize_set( $sentence_internal, "CS466/sentence_internal" );
+
+while (defined ($line = <STDIN>)) {
+
+    my @words = split ' ', $line;
+
+    my $class   = shift @words;    # 'EOS' or 'NEOS'
+    my $id      = shift @words;    # sentence identifier
+    my $L3      = shift @words;    # 3rd word to the left of period
+    my $L2      = shift @words;    # 2nd word to the left of period
+    my $L1      = shift @words;    # 1st word to the left of period
+    my $C       = shift @words;    # the period
+    my $R1      = shift @words;    # 1st word to the right of period
+    my $R2      = shift @words;    # 2nd word to the right of period
+    my $R3      = shift @words;    # 3rd word to the right of period
+    my $Llength = shift @words;    # words to the left before a !,?, or <P>
+    my $Rlength = shift @words;    # words to the right before a !,?, or <P>
+    my $Nspaces = shift @words;    # number of spaces after the period
+
+    # Rule definitions
+    #
+    #    1) If the word immediately to the right begins with a lower case 
+    #       letter than not an end of sentence
+    #
+    #    2) If the token immediately to the right is a paragraph indicator than
+    #       is an end of sentence
+    #
+    #    3) If the token immediately to the right of a paragraph indicator is a 
+    #       comma or period than not an end of sentence
+    #
+    #    4) If the token immediately to the left is a singular capital letter
+    #       than not an end of sentence
+    #
+    #    5) If the token immediately to the left is a common title than not an
+    #       end of sentence
+    #
+    #    6) If the token immediately to the left is a common abbreviation than
+    #       not an end of sentence
+    #
+    #    7) If the word to the right is capitalized then is an end of sentence.
+    #       This is the default state.
+    #
+    #    8) If the token immediately to the left is a common timeterm than
+    #       not an end of sentence
+    # 
+    #    9) If token to the left has both letters and periods, then not end of sentence.
+    #	
+    #    10) If the token to the left is an unlikely proper noun, then end of sentence.
+    #
+    #	 11) If the token to the left is a sentence internal, then not end of sentence.
+	#
+	#	 12) If the token to the left or right is quotation marks, then end of sentence.	
+       
+    if   ( $R1 =~ /^[a-z]/ ) { 
+    	&ret( 1, $class, $id, 'NEOS', $line); 
+    }
+	
+    elsif ( $L1 =~ /[a-z]+[.]+/ ) { 				#lowercase letter and periods
+    	&ret( 9, $class, $id, 'NEOS', $line); 
+    }
+    
+    elsif ( $L1 =~ /[A-Z]+[.]+/ ) {     			#uppercase letter and periods
+    	&ret( 9, $class, $id, 'NEOS', $line);   
+    } 
+        		
+    elsif ( ($R1 =~ /^<P>$/)  ) { 
+    	
+    	if ($R2 eq ".") {
+    		&ret(3, $class, $id, 'NEOS', $line);
+    	}
+    	else {
+    		&ret( 2, $class, $id, 'EOS' , $line); 
+    	}
+    }
+    
+    elsif ( $R1 =~ /^[,.]/  ) { 
+    	&ret( 3, $class, $id, 'NEOS', $line); 
+    }
+    
+    elsif ( $L1 =~ /^[A-Z,a-z]$/) { 
+    	&ret( 4, $class, $id, 'NEOS', $line); 
+    }
+    
+    elsif (exists $$timeterms{"\L$L1" }) {
+		&ret( 8, $class, $id, 'EOS', $line); 
+	}    
+    
+    elsif (exists $$unlikely_proper_nouns{"\L$L1" }) {
+		&ret( 10, $class, $id, 'EOS', $line); 
+	}    
+    
+    elsif ( exists $$sentence_internal{ "\L$L1" }) { 
+    
+    	&ret( 11, $class, $id, 'NEOS', $line); 
+    }
+    
+	elsif ( exists $$titles{ "\L$L1" }) { 
+	
+		&ret( 5, $class, $id, 'NEOS', $line); 
+	}
+	
+    elsif ( $R1 =~ /^['`"]+$/ ) { 
+    	&ret( 12, $class, $id, 'EOS', $line); 
+    
+    }
+    
+    elsif ( $L1 =~ /^['`"]+$/ ) {
+    	&ret( 12, $class, $id, 'EOS', $line); 
+    }
+	
+    elsif ( exists $$abbrvs{ "\L$L1" }) { 
+    	&ret( 6, $class, $id, 'NEOS', $line); 
+    }
+    
+	#Taken from yarowsky examp1.prl
+    elsif ( $R1 =~ /^[A-Z]/ ) { 
+		if    (exists $$titles{ "\L$L1" }) { 
+			&ret( 5, $class, $id, 'NEOS', $line); 
+		}
+		elsif (exists $$abbrvs{ "\L$L1" }) { 
+			&ret( 6, $class, $id, 'NEOS', $line); 
+		}
+		else                               { 
+			&ret( 7, $class, $id, 'EOS' , $line); 
+		}
+    }
+    else  { 
+    	&ret( 7, $class, $id, 'EOS' , $line); 
+    }
+}
+
+#Print summary of each rule
+
+
+my $ruleNumber = 1;
+
+while ($ruleNumber <= 13)
+{
+
+	if (!defined ($correct[$ruleNumber])) { 
+		$correct[$ruleNumber] = 0; 
+	}
+	
+	if (!defined ($incorrect[$ruleNumber])) { 
+		$incorrect[$ruleNumber] = 0; 
+	}
+	
+	if (($correct[$ruleNumber] + $incorrect[$ruleNumber]) == 0) {
+		$correct[$ruleNumber] = 0.0001;
+		print "\n";
+		print "RULE ", $ruleNumber , " NOT USED! IGNORE THE STATISTICS FOR THE RULE!";
+		print "\n------------------------------------------------------------------";
+	}
+	
+	print "\n\n";
+
+	print "## Rule ", $ruleNumber, " was used: ", $correct[$ruleNumber] + $incorrect[$ruleNumber], 
+			" times", ", a percentage of: ", ($correct[$ruleNumber] + $incorrect[$ruleNumber]) / 
+				($correct + $incorrect) * 100, "%\n";
+
+	print "## Rule ", $ruleNumber, " was used CORRECTLY: ", $correct[$ruleNumber], " = ", 
+		$correct[$ruleNumber] / ($correct[$ruleNumber] + $incorrect[$ruleNumber]) * 100, "%\n";
+		
+	print  "## Rule ", $ruleNumber,	" was used INCORRECTLY: ", $incorrect[$ruleNumber], " = ", 
+		$incorrect[$ruleNumber] / ($correct[$ruleNumber] + $incorrect[$ruleNumber]) * 100, "%\n";
+
+	$ruleNumber++;
+}
+
+print "\n### HW1A aghosh17- OVERALL CORRECT: ", $correct, " = ", $correct/($correct + $incorrect)*100, "% INCORRECT: ", $incorrect, " = ", $incorrect/($correct + $incorrect)*100, "%";
+
+
+############################################################ 
+## RET - prints full line for errors and keeps score. $rule
+##     - indicates the rule number responsible for the 
+##     - classification
+##
+##  This is a useful debugging tool, as after each change in
+##  the program one can identify the remaining misclassified
+##  training examples and the patterns responsible for them. 
+############################################################
+ 
+
+sub ret {
+
+    my $rule       = shift;   # which rule did I use here, same as $where in examp4
+    my $trueclass  = shift;   # what is the true sentence class ('NEOS','EOS')
+    my $id         = shift;   # sentence identifier
+    my $givenclass = shift;   # what is the sentence class my rule gives
+    my $line       = shift;   # the actual line tested
+    
+    if ($trueclass eq $givenclass) {
+
+	print ".. (at rule ", $rule, ") - ", $line;	
+	$correct++;
+	$correct[$rule]++;
+    }
+    else {
+	
+	print "XX (at rule ", $rule, ") - ", $line;
+	$incorrect++;
+	$incorrect[$rule]++;
+    }
+    $counter += 1;
+}
+
+
+
+
+############################################################
+## INITIALIZE_SET - loads named associative array with set 
+##                - members   
+############################################################
+    
+sub initialize_set {
+
+    my $hash   = shift;  # hash to initialize (hash reference)
+    my $file   = shift;  # file to retrieve words from
+
+    my $word   = undef;
+    my $handle = new FileHandle $file, "r";  # open file for reading only
+
+    if (defined $handle) {
+	while (defined ($word = <$handle>)) {
+	    
+	    chomp   $word;
+	    $$hash{ $word } = 1;
+	}
+    }
+    undef $handle;                           # close the file
+}
+
+
+
+
+
